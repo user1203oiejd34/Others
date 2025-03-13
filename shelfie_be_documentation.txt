@@ -1,0 +1,867 @@
+backend/
+├── app.py
+├── functions/
+│   ├── __init__.py
+│   ├── customers.py
+│   ├── invoices.py
+│   ├── items.py
+│   ├── orders.py
+│   ├── users.py
+├── instance/
+│   ├── shelfie.db
+├── models.py
+├── requirements.txt
+
+
+// Content
+
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/app.py
+
+from flask import Flask
+from models import db
+from flask_cors import CORS
+from functions.customers import customers_bp
+from functions.invoices import invoices_bp
+from functions.items import items_bp
+from functions.orders import orders_bp
+from functions.users import users_bp
+
+app = Flask(__name__)
+CORS(app) 
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shelfie.db'  
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False      
+
+db.init_app(app)
+
+app.register_blueprint(customers_bp, url_prefix='/customers')
+app.register_blueprint(invoices_bp, url_prefix='/invoices')
+app.register_blueprint(items_bp, url_prefix='/items')
+app.register_blueprint(orders_bp, url_prefix='/orders')
+app.register_blueprint(users_bp, url_prefix='/users')
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/models.py
+
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from werkzeug.security import generate_password_hash
+
+db = SQLAlchemy()
+
+class User(db.Model):
+
+    # __tablename__ = 'User' 
+
+    username = db.Column(db.String(255), primary_key=True)
+    password_hash = db.Column(db.Text, nullable=False)
+
+    def set_password(self, password):
+        """Hashes the password and stores it"""
+        self.password_hash = generate_password_hash(password)
+
+
+class Item(db.Model):
+
+    # __tablename__ = 'Item' 
+
+    SKU = db.Column(db.String(50), primary_key=True)
+    Title = db.Column(db.String(255), nullable=False)
+    Description = db.Column(db.Text)
+    PricePerUnit = db.Column(db.Numeric(10, 2), nullable=False)
+    Quantity = db.Column(db.Integer, nullable=False, default=0, server_default="0", check_constraint="Quantity >= 0")
+
+class Customer(db.Model):
+
+    # __tablename__ = 'Customer' 
+
+    ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    fName = db.Column(db.String(100), nullable=False)
+    lName = db.Column(db.String(100), nullable=False)
+    Phone = db.Column(db.String(20))
+    Email = db.Column(db.String(255), unique=True)
+    Address = db.Column(db.Text)
+    City = db.Column(db.String(100))
+    Country = db.Column(db.String(100))
+
+class Order(db.Model):
+
+    # __tablename__ = 'Order' 
+    
+    ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    CustomerID = db.Column(db.Integer, db.ForeignKey("customer.ID", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    PlacedBy = db.Column(db.String(255), db.ForeignKey("user.username", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
+    TotalPrice = db.Column(db.Numeric(10, 2), nullable=True, check_constraint="TotalPrice >= 0")
+    Status = db.Column(db.String(20), nullable=False, check_constraint="Status IN ('Pending', 'Shipped', 'Delivered', 'Cancelled')")
+    CreatedAt = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    UpdatedAt = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, onupdate=datetime.utcnow)
+
+    customer = db.relationship("Customer", backref=db.backref("orders", cascade="all, delete"))
+    user = db.relationship("User", backref=db.backref("orders", cascade="all, delete-orphan"))
+
+class OrderItems(db.Model):
+
+    __tablename__ = 'OrderItems' 
+
+    ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    OrderID = db.Column(db.Integer, db.ForeignKey("order.ID", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    ItemSKU = db.Column(db.String(50), db.ForeignKey("item.SKU", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    ItemQuantity = db.Column(db.Integer, nullable=False, check_constraint="ItemQuantity > 0")
+    Price = db.Column(db.Numeric(10, 2), nullable=False, check_constraint="Price >= 0")
+
+    order = db.relationship("Order", backref=db.backref("order_items", cascade="all, delete"))
+    item = db.relationship("Item", backref=db.backref("order_items", cascade="all, delete"))
+
+class Invoice(db.Model):
+
+    # __tablename__ = 'Invoice' 
+
+    ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    OrderID = db.Column(db.Integer, db.ForeignKey("order.ID", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    CreatedAt = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    PaymentAmount = db.Column(db.Numeric(10, 2), nullable=False, check_constraint="PaymentAmount >= 0")
+    Description = db.Column(db.Text)
+
+    order = db.relationship("Order", backref=db.backref("invoices", cascade="all, delete"))
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/requirements.txt
+
+blinker==1.9.0
+click==8.1.8
+Flask==3.1.0
+Flask-Cors==5.0.0
+Flask-SQLAlchemy==3.1.1
+itsdangerous==2.2.0
+Jinja2==3.1.5
+Mako==1.3.8
+MarkupSafe==3.0.2
+SQLAlchemy==2.0.36
+typing_extensions==4.12.2
+Werkzeug==3.1.3
+
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/instance/shelfie.db
+
+// [Binary or non-text file skipped]
+
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/functions/__init__.py
+
+# Required to make 'functions' a package
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/functions/customers.py
+
+from flask import Blueprint, jsonify, request
+from models import db, Customer
+
+customers_bp = Blueprint('customers', __name__)
+
+# Function 6: Retrieve Customers
+# This function returns all customers in the database.
+@customers_bp.route('/', methods=['GET'])
+def get_customers():
+    """Fetch all customers"""
+    customers = Customer.query.all()
+    customer_list = [
+        {
+            "ID": customer.ID,
+            "fName": customer.fName,
+            "lName": customer.lName,
+            "Phone": customer.Phone,
+            "Email": customer.Email,
+            "Address": customer.Address,
+            "City": customer.City,
+            "Country": customer.Country
+        }
+        for customer in customers
+    ]
+    return jsonify(customer_list), 200
+
+
+# Function 7: Create Customer
+# This function creates a new customer in the database.
+# Only fName and lName are required; other fields can be updated later.
+@customers_bp.route('/create', methods=['POST'])
+def create_customer():
+    """Create a new customer"""
+    data = request.get_json()
+
+    # Validate required fields
+    if "fName" not in data or "lName" not in data:
+        return jsonify({"error": "First name and last name are required"}), 400
+
+    # Extract fields, using None for optional fields
+    fName = data["fName"]
+    lName = data["lName"]
+    phone = data.get("Phone")
+    email = data.get("Email")
+    address = data.get("Address")
+    city = data.get("City")
+    country = data.get("Country")
+
+    # Create new customer
+    new_customer = Customer(
+        fName=fName,
+        lName=lName,
+        Phone=phone,
+        Email=email,
+        Address=address,
+        City=city,
+        Country=country
+    )
+    db.session.add(new_customer)
+    db.session.commit()
+
+    return jsonify({"message": "Customer created successfully", "ID": new_customer.ID}), 201
+
+
+# Function 8: Edit Customer
+# This function updates an existing customer's details.
+# If the CustomerID exists, it updates only the provided fields.
+# If the CustomerID does not exist, it returns an error.
+@customers_bp.route('/edit/<int:CustomerID>', methods=['PUT'])
+def edit_customer(CustomerID):
+    """Edit an existing customer"""
+    data = request.get_json()
+
+    # Find the customer in the database
+    customer = Customer.query.get(CustomerID)
+
+    if not customer:
+        return jsonify({"error": "Customer with the given ID does not exist"}), 404
+
+    # Update only provided fields
+    if "fName" in data:
+        customer.fName = data["fName"]
+    if "lName" in data:
+        customer.lName = data["lName"]
+    if "Phone" in data:
+        customer.Phone = data["Phone"]
+    if "Email" in data:
+        customer.Email = data["Email"]
+    if "Address" in data:
+        customer.Address = data["Address"]
+    if "City" in data:
+        customer.City = data["City"]
+    if "Country" in data:
+        customer.Country = data["Country"]
+
+    db.session.commit()
+
+    return jsonify({"message": "Customer updated successfully", "ID": CustomerID}), 200
+
+
+# Function 9: Delete Customer
+# This function deletes a customer based on their ID.
+# If the CustomerID exists, it deletes the customer and returns a success message.
+# If the CustomerID does not exist, it returns an error message.
+@customers_bp.route('/delete/<int:CustomerID>', methods=['DELETE'])
+def delete_customer(CustomerID):
+    """Delete a customer if they exist"""
+    customer = Customer.query.get(CustomerID)
+
+    if not customer:
+        return jsonify({"error": "Customer with the given ID does not exist"}), 404
+
+    db.session.delete(customer)
+    db.session.commit()
+
+    return jsonify({"message": "Customer deleted successfully", "ID": CustomerID}), 200
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/functions/invoices.py
+
+from flask import Blueprint, jsonify, request
+from models import db, Invoice, Order
+from datetime import datetime
+
+invoices_bp = Blueprint('invoices', __name__)
+
+# Function 18: Retrieve Invoices
+# This function joins the orders and invoices tables and returns all invoice details.
+@invoices_bp.route('/', methods=['GET'])
+def get_invoices():
+    """Fetch all invoices with related order details"""
+    invoices = Invoice.query.all()
+    invoice_list = [
+        {
+            "InvoiceID": invoice.ID,
+            "CreatedAt": invoice.CreatedAt.strftime('%Y-%m-%d %H:%M:%S'),
+            "PaymentAmount": float(invoice.PaymentAmount),
+            "Description": invoice.Description,
+            "Order": {
+                "OrderID": invoice.OrderID,
+                "TotalPrice": float(invoice.order.TotalPrice) if invoice.order.TotalPrice else 0.00
+            }
+        }
+        for invoice in invoices
+    ]
+
+    return jsonify(invoice_list), 200
+
+
+# Function 19: Create Invoice
+# This function creates a new invoice if OrderID exists in the database.
+@invoices_bp.route('/create', methods=['POST'])
+def create_invoice():
+    """Create a new invoice"""
+    data = request.get_json()
+
+    if "OrderID" not in data or "PaymentAmount" not in data:
+        return jsonify({"error": "OrderID and PaymentAmount are required"}), 400
+
+    order = Order.query.get(data["OrderID"])
+    if not order:
+        return jsonify({"error": "OrderID does not exist"}), 404
+
+    new_invoice = Invoice(
+        OrderID=data["OrderID"],
+        PaymentAmount=data["PaymentAmount"],
+        Description=data.get("Description", None)  # Optional field
+    )
+
+    db.session.add(new_invoice)
+    db.session.commit()
+
+    return jsonify({"message": "Invoice created successfully", "InvoiceID": new_invoice.ID}), 201
+
+
+# Function 20: Delete Invoice
+# This function deletes an invoice from the database if the InvoiceID exists.
+@invoices_bp.route('/delete/<int:InvoiceID>', methods=['DELETE'])
+def delete_invoice(InvoiceID):
+    """Delete an invoice"""
+    invoice = Invoice.query.get(InvoiceID)
+
+    if not invoice:
+        return jsonify({"error": "Invoice with the given ID does not exist"}), 404
+
+    db.session.delete(invoice)
+    db.session.commit()
+
+    return jsonify({"message": "Invoice deleted successfully", "InvoiceID": InvoiceID}), 200
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/functions/items.py
+
+from flask import Blueprint, jsonify, request
+from models import db, Item
+
+items_bp = Blueprint('items', __name__)
+
+
+# Function 2: Retrieve inventory 
+# It returns all inventory items in the database. 
+@items_bp.route('/', methods=['GET'])
+def get_items():
+    """Fetch all inventory items"""
+    items = Item.query.all()
+    item_list = [
+        {
+            "SKU": item.SKU,
+            "Title": item.Title,
+            "Description": item.Description,
+            "PricePerUnit": float(item.PricePerUnit),
+            "Quantity": item.Quantity
+        }
+        for item in items
+    ]
+    return jsonify(item_list), 200
+
+
+# Function 3: Create Inventory Item
+# This function creates a new item in the database if the SKU is unique.
+# It returns a success message if the item is added successfully.
+# If the SKU already exists, it returns an appropriate error message.
+@items_bp.route('/create', methods=['POST'])
+def create_item():
+    """Create a new inventory item if SKU is unique"""
+    data = request.get_json()
+
+    # Validate input fields
+    required_fields = ['SKU', 'Title', 'Description', 'PricePerUnit', 'Quantity']
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    sku = data['SKU']
+    title = data['Title']
+    description = data['Description']
+    price_per_unit = data['PricePerUnit']
+    quantity = data['Quantity']
+
+    # Ensure price and quantity are valid
+    if not isinstance(price_per_unit, (int, float)) or price_per_unit < 0:
+        return jsonify({"error": "PricePerUnit must be a positive number"}), 400
+    if not isinstance(quantity, int) or quantity < 0:
+        return jsonify({"error": "Quantity must be a non-negative integer"}), 400
+
+    # Check if the SKU already exists
+    existing_item = Item.query.filter_by(SKU=sku).first()
+    if existing_item:
+        return jsonify({"error": "SKU already exists"}), 409
+
+    # Create new inventory item
+    new_item = Item(SKU=sku, Title=title, Description=description, PricePerUnit=price_per_unit, Quantity=quantity)
+    db.session.add(new_item)
+    db.session.commit()
+
+    return jsonify({"message": "Item created successfully", "SKU": sku}), 201
+
+# Function 4: Edit Inventory Item
+# This function updates an existing item in the database.
+# It checks if the SKU exists, and updates only the fields provided.
+# If the SKU does not exist, it returns an error message.
+@items_bp.route('/edit/<string:SKU>', methods=['PUT'])
+def edit_item(SKU):
+    """Edit an inventory item if the SKU exists"""
+    data = request.get_json()
+
+    # Find the item in the database
+    item = Item.query.filter_by(SKU=SKU).first()
+    
+    if not item:
+        return jsonify({"error": "Item with the given SKU does not exist"}), 404
+
+    # Update fields only if they are provided in the request
+    if "Title" in data:
+        item.Title = data["Title"]
+    if "Description" in data:
+        item.Description = data["Description"]
+    if "PricePerUnit" in data:
+        if isinstance(data["PricePerUnit"], (int, float)) and data["PricePerUnit"] >= 0:
+            item.PricePerUnit = data["PricePerUnit"]
+        else:
+            return jsonify({"error": "PricePerUnit must be a positive number"}), 400
+    if "Quantity" in data:
+        if isinstance(data["Quantity"], int) and data["Quantity"] >= 0:
+            item.Quantity = data["Quantity"]
+        else:
+            return jsonify({"error": "Quantity must be a non-negative integer"}), 400
+
+    # Commit the changes to the database
+    db.session.commit()
+
+    return jsonify({"message": "Item updated successfully", "SKU": SKU}), 200
+
+# Function 5: Delete Inventory Item
+# This function deletes an item from the database based on its SKU.
+# If the SKU exists, it will delete the item and return a confirmation message.
+# If the SKU does not exist, it will return an error message.
+@items_bp.route('/delete/<string:SKU>', methods=['DELETE'])
+def delete_item(SKU):
+    """Delete an inventory item if the SKU exists"""
+    # Find the item in the database
+    item = Item.query.filter_by(SKU=SKU).first()
+    
+    if not item:
+        return jsonify({"error": "Item with the given SKU does not exist"}), 404
+
+    # Delete the item from the database
+    db.session.delete(item)
+    db.session.commit()
+
+    return jsonify({"message": "Item deleted successfully", "SKU": SKU}), 200
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/functions/orders.py
+
+from flask import Blueprint, jsonify, request
+from models import db, Order, OrderItems, Customer, User, Item
+from datetime import datetime
+
+orders_bp = Blueprint('orders', __name__)
+
+
+
+
+# Function 10: Retrieve Orders
+# This function joins the orders, customers, and orderItems tables
+# and returns all order details including related order items and customer data.
+@orders_bp.route('/', methods=['GET'])
+def get_orders():
+    """Fetch all orders with customer and order item details"""
+    orders = Order.query.all()
+    order_list = []
+
+    for order in orders:
+        order_items = [
+            {
+                "OrderItemID": item.ID,
+                "ItemSKU": item.ItemSKU,
+                "ItemQuantity": item.ItemQuantity,
+                "Price": float(item.Price)
+            }
+            for item in order.order_items
+        ]
+
+        order_data = {
+            "OrderID": order.ID,
+            "PlacedBy": order.PlacedBy,
+            "TotalPrice": float(order.TotalPrice) if order.TotalPrice else None,
+            "Status": order.Status,
+            "CreatedAt": order.CreatedAt.strftime('%Y-%m-%d %H:%M:%S'),
+            "UpdatedAt": order.UpdatedAt.strftime('%Y-%m-%d %H:%M:%S'),
+            "OrderItems": order_items,
+            "Customer": {
+                "CustomerID": order.CustomerID,
+                "fName": order.customer.fName,
+                "lName": order.customer.lName
+            }
+        }
+
+        order_list.append(order_data)
+
+    return jsonify(order_list), 200
+
+
+# Function 11: Create Order
+# This function creates a new order if CustomerID and PlacedBy exist in the database.
+@orders_bp.route('/create', methods=['POST'])
+def create_order():
+    """Create a new order"""
+    data = request.get_json()
+
+    # Validate input fields
+    if "CustomerID" not in data or "PlacedBy" not in data:
+        return jsonify({"error": "CustomerID and PlacedBy are required"}), 400
+
+    # Validate customer and user existence
+    customer = Customer.query.get(data["CustomerID"])
+    user = User.query.get(data["PlacedBy"])
+
+    if not customer:
+        return jsonify({"error": "CustomerID does not exist"}), 404
+    if not user:
+        return jsonify({"error": "PlacedBy user does not exist"}), 404
+
+    # Create new order
+    new_order = Order(
+        CustomerID=data["CustomerID"],
+        PlacedBy=data["PlacedBy"],
+        TotalPrice=None,
+        Status="Pending"
+    )
+    db.session.add(new_order)
+    db.session.commit()
+
+    return jsonify({"message": "Order created successfully", "OrderID": new_order.ID}), 201
+
+
+# Function 12: Edit Order
+# This function updates an existing order's CustomerID or Status if the OrderID exists.
+@orders_bp.route('/edit/<int:OrderID>', methods=['PUT'])
+def edit_order(OrderID):
+    """Edit an existing order and update inventory based on status changes"""
+    data = request.get_json()
+    order = Order.query.get(OrderID)
+
+    if not order:
+        return jsonify({"error": "Order with the given ID does not exist"}), 404
+
+    previous_status = order.Status  # Track the current status before making changes
+
+    # Update CustomerID if provided
+    if "CustomerID" in data:
+        customer = Customer.query.get(data["CustomerID"])
+        if not customer:
+            return jsonify({"error": "CustomerID does not exist"}), 404
+        order.CustomerID = data["CustomerID"]
+
+    # Update Status if provided
+    if "Status" in data:
+        new_status = data["Status"]
+        if new_status not in ["Pending", "Shipped", "Delivered", "Cancelled"]:
+            return jsonify({"error": "Invalid status"}), 400
+
+        # Handle inventory adjustments based on status changes
+        if previous_status == "Pending" and new_status == "Shipped":
+            # Deduct inventory for each item in the order
+            for order_item in order.order_items:
+                item = order_item.item
+                if item.Quantity < order_item.ItemQuantity:
+                    return jsonify({
+                        "error": f"Not enough inventory for item {item.SKU}. Available: {item.Quantity}, Required: {order_item.ItemQuantity}"
+                    }), 400
+                item.Quantity -= order_item.ItemQuantity
+
+        elif previous_status == "Shipped" and new_status == "Cancelled":
+            # Replenish inventory for each item in the order
+            for order_item in order.order_items:
+                item = order_item.item
+                item.Quantity += order_item.ItemQuantity
+
+        # Update the order status
+        order.Status = new_status
+
+    # Update the order's updated timestamp
+    order.UpdatedAt = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({"message": "Order updated successfully", "OrderID": OrderID}), 200
+
+
+# Function 13: Delete Order
+# This function deletes an order from the database if the OrderID exists.
+@orders_bp.route('/delete/<int:OrderID>', methods=['DELETE'])
+def delete_order(OrderID):
+    """Delete an order"""
+    order = Order.query.get(OrderID)
+
+    if not order:
+        return jsonify({"error": "Order with the given ID does not exist"}), 404
+
+    db.session.delete(order)
+    db.session.commit()
+
+    return jsonify({"message": "Order deleted successfully", "OrderID": OrderID}), 200
+
+
+# Function 14: Retrieve Order Items
+# This function returns all order items in the database.
+@orders_bp.route('/items', methods=['GET'])
+def get_order_items():
+    """Fetch all order items"""
+    order_items = OrderItems.query.all()
+    order_item_list = [
+        {
+            "OrderItemID": item.ID,
+            "OrderID": item.OrderID,
+            "ItemSKU": item.ItemSKU,
+            "ItemQuantity": item.ItemQuantity,
+            "Price": float(item.Price)
+        }
+        for item in order_items
+    ]
+    return jsonify(order_item_list), 200
+
+
+def update_order_total(order_id):
+    """Recalculates the total price of an order based on its order items"""
+    order = Order.query.get(order_id)
+    if not order:
+        return
+
+    total_price = db.session.query(db.func.sum(OrderItems.Price)).filter_by(OrderID=order_id).scalar()
+    order.TotalPrice = total_price if total_price else 0.00
+    db.session.commit()
+    
+# Function 15: Create Order Item
+# This function creates a new order item if OrderID and ItemSKU exist in the database.
+@orders_bp.route('/items/create', methods=['POST'])
+def create_order_item():
+    """Create a new order item and update the order's total price"""
+    data = request.get_json()
+
+    if "OrderID" not in data or "ItemSKU" not in data or "ItemQuantity" not in data:
+        return jsonify({"error": "OrderID, ItemSKU, and ItemQuantity are required"}), 400
+
+    order = Order.query.get(data["OrderID"])
+    item = Item.query.get(data["ItemSKU"])
+
+    if not order:
+        return jsonify({"error": "OrderID does not exist"}), 404
+    if not item:
+        return jsonify({"error": "ItemSKU does not exist"}), 404
+
+    price = item.PricePerUnit * data["ItemQuantity"]
+
+    new_order_item = OrderItems(
+        OrderID=data["OrderID"],
+        ItemSKU=data["ItemSKU"],
+        ItemQuantity=data["ItemQuantity"],
+        Price=price
+    )
+    db.session.add(new_order_item)
+    db.session.commit()
+
+    # ✅ Recalculate order total
+    update_order_total(data["OrderID"])
+
+    return jsonify({"message": "Order item created successfully", "OrderItemID": new_order_item.ID}), 201
+
+
+# Function 16: Edit Order Item
+# This function updates an order item's quantity and recalculates the price.
+@orders_bp.route('/items/edit/<int:OrderItemID>', methods=['PUT'])
+def edit_order_item(OrderItemID):
+    """Edit an order item, update quantity, and recalculate order price"""
+    data = request.get_json()
+    order_item = OrderItems.query.get(OrderItemID)
+
+    if not order_item:
+        return jsonify({"error": "OrderItem with the given ID does not exist"}), 404
+
+    if "ItemQuantity" in data:
+        if data["ItemQuantity"] <= 0:
+            return jsonify({"error": "ItemQuantity must be greater than 0"}), 400
+        order_item.ItemQuantity = data["ItemQuantity"]
+        order_item.Price = order_item.item.PricePerUnit * data["ItemQuantity"]
+
+    db.session.commit()
+
+    # ✅ Recalculate order total
+    update_order_total(order_item.OrderID)
+
+    return jsonify({"message": "Order item updated successfully", "OrderItemID": OrderItemID}), 200
+
+
+# Function 17: Delete Order Item
+# This function deletes an order item from the database if the OrderItemID exists.
+@orders_bp.route('/items/delete/<int:OrderItemID>', methods=['DELETE'])
+def delete_order_item(OrderItemID):
+    """Delete an order item and update the order total price"""
+    order_item = OrderItems.query.get(OrderItemID)
+
+    if not order_item:
+        return jsonify({"error": "OrderItem with the given ID does not exist"}), 404
+
+    order_id = order_item.OrderID
+    db.session.delete(order_item)
+    db.session.commit()
+
+    # ✅ Recalculate order total
+    update_order_total(order_id)
+
+    return jsonify({"message": "Order item deleted successfully", "OrderItemID": OrderItemID}), 200
+
+// File: /Users/rajasakakini/Documents/Shelfie Inventory Management System/backend/functions/users.py
+
+from flask import Blueprint, jsonify, request
+from models import db, User
+from werkzeug.security import check_password_hash, generate_password_hash
+
+users_bp = Blueprint('users', __name__)
+
+
+#Function 1: Login 
+# The function takes the username and password,
+# and checks if the credentials are valid. 
+#If the credentials are valid, it will return a success message and the username.
+#If the credentials are invalid, it will return an error message.
+@users_bp.route('/login', methods=['POST'])
+def login():
+    """Authenticate a user"""
+    data = request.get_json()
+
+    # Ensure username and password are provided
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    username = data['username']
+    password = data['password']
+
+    # Fetch user from database
+    user = User.query.filter_by(username=username).first()
+
+    # Check if user exists and password is correct
+    if user and check_password_hash(user.password_hash, password):
+        return jsonify({"message": "Login successful", "username": user.username}), 200
+    else:
+        return jsonify({"error": "Invalid username or password"}), 401
+
+
+# Function 21: Retrieve Users
+# This function fetches all users from the database and returns an array of usernames.
+@users_bp.route('/', methods=['GET'])
+def get_users():
+    """Fetch all registered usernames"""
+    users = User.query.with_entities(User.username).all()
+    user_list = [user.username for user in users]
+
+    return jsonify(user_list), 200
+
+#Function 22: Register User
+#This function checks:
+# 1. If the username is unique
+# 2.  If password is a minimum of 8 characters. 
+# If both conditions are satisfied, then it will create a new user with the provided username and password.
+#  It will hash the password for security. 
+# If the username exists or the password is less than 8 characters,
+# it will return an error. 	A confirmation message that a new user has been created. 
+
+@users_bp.route('/register', methods=['POST'])
+def create_user():
+    """Creates a new user if username is unique and password is secure."""
+    data = request.get_json()
+
+    # Validate input fields
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    username = data['username']
+    password = data['password']
+
+    # Check if the username already exists
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        return jsonify({"error": "Username already exists"}), 409
+
+    # Check if password meets length requirement
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters long"}), 400
+
+    # Hash the password
+    hashed_password = generate_password_hash(password)
+
+    # Create new user
+    new_user = User(username=username, password_hash=hashed_password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"message": "User created successfully", "username": username}), 201
+
+# Function 23: Change Password
+# This function allows a user to change their password by verifying the old password first.
+@users_bp.route('/change-password', methods=['PUT'])
+def change_password():
+    """Change the password for an existing user"""
+    data = request.get_json()
+
+    # Validate input fields
+    if not data or 'username' not in data or 'oldpassword' not in data or 'newpassword' not in data:
+        return jsonify({"error": "Username, old password, and new password are required"}), 400
+
+    username = data['username']
+    old_password = data['oldpassword']
+    new_password = data['newpassword']
+
+    # Fetch user from the database
+    user = User.query.filter_by(username=username).first()
+
+    if not user:
+        return jsonify({"error": "User does not exist"}), 404
+
+    # Check if old password is correct
+    if not check_password_hash(user.password_hash, old_password):
+        return jsonify({"error": "Incorrect old password"}), 401
+
+    # Ensure new password meets the minimum length requirement
+    if len(new_password) < 8:
+        return jsonify({"error": "New password must be at least 8 characters long"}), 400
+
+    # Hash the new password and update in database
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+
+    return jsonify({"message": "Password changed successfully"}), 200
+
+# Function 24: Delete User
+# This function receives a username, 
+# and deletes its correspnding user from the database. 
+# If the username doesn’t exist, it will return an error message. 	
+# If the username exists, it will return a confirmation message for the deletion. 
+#Else it will output an error message. 
+
+@users_bp.route('/delete/<string:username>', methods=['DELETE'])
+def delete_user(username):
+    """Delete a user by username"""
+    user = User.query.filter_by(username=username).first()
+
+    if not user:
+        return jsonify({"error": "User does not exist"}), 404
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({"message": f"User '{username}' deleted successfully"}), 200
